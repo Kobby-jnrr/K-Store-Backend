@@ -24,6 +24,26 @@ router.get("/", async (req, res) => {
 });
 
 /* =====================================================
+   GET products of the logged-in vendor
+===================================================== */
+router.get("/vendor", verifyToken, verifyVendor, async (req, res) => {
+  try {
+    const products = await Product.find({ vendor: req.user._id }).populate("vendor", "username verified");
+    
+    const result = products.map(p => ({
+      ...p.toObject(),
+      vendorName: p.vendor?.username || "Unknown",
+      vendorVerified: p.vendor?.verified || false,
+    }));
+
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ message: "Error fetching vendor products", error: err.message });
+  }
+});
+
+
+/* =====================================================
    GET products by category
 ===================================================== */
 router.get("/:category", async (req, res) => {

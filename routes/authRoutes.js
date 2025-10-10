@@ -113,4 +113,28 @@ router.post("/logout", async (req, res) => {
   }
 });
 
+// ✅ Check user verification status
+router.get("/status/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await User.findById(id).select("username email verified role phone location");
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({
+      verified: user.verified,
+      username: user.username,
+      role: user.role,
+      email: user.email,
+      phone: user.phone || "Not added yet",
+      location: user.location || "No location set",
+    });
+  } catch (err) {
+    console.error("❌ Error fetching user status:", err);
+    res.status(500).json({ message: "Failed to fetch user status" });
+  }
+});
+
 export default router;

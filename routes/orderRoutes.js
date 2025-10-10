@@ -74,6 +74,53 @@ router.get("/vendor-orders", verifyToken, async (req, res) => {
     res.status(500).json({ error: "Failed to fetch vendor orders" });
   }
 });
+/* ===================== UPDATE VENDOR ITEM STATUS ===================== */
+router.put("/vendor-orders/:orderId/item/:itemId", verifyToken, async (req, res) => {
+  try {
+    const { orderId, itemId } = req.params;
+    const { status } = req.body;
+    const vendorId = req.user.id;
 
+    console.log({ orderId, itemId, status, vendorId });
+
+    const order = await Order.findById(orderId);
+    if (!order) return res.status(404).json({ error: "Order not found" });
+
+    const item = order.items.id(itemId);
+    console.log("Found item:", item);
+    if (!item) return res.status(404).json({ error: "Item not found" });
+
+    if (item.vendor.toString() !== vendorId) {
+      return res.status(403).json({ error: "Not authorized" });
+    }
+
+    item.status = status;
+    await order.save();
+
+    res.json({ message: "Item status updated", item });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to update item status", details: err.message });
+  }
+});
+
+// POST /api/admin/orders/:orderId/pass
+router.post("/orders/:orderId/pass", verifyToken, async (req, res) => {
+  try {
+    const { vendorId } = req.body;
+    const order = await Order.findById(req.params.orderId);
+    if (!order) return res.status(404).json({ error: "Order not found" });
+
+    if (!order.passedToVendors) order.passedToVendors = [];
+    if (!order.passedToVendors.includes(vendorId)) {
+      order.passedToVendors.push(vendorId);
+    }
+
+    await order.save();
+    res.json({ message: "Order passed to vendor", order });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to pass order" });
+  }
+});
 
 export default router;

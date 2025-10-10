@@ -9,6 +9,8 @@ const orderSchema = new mongoose.Schema(
         quantity: { type: Number, required: true },
         price: { type: Number, required: true },
         vendor: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+        status:{type: String, enum: ["pending", "accepted", "rejected", "preparing", "ready", "delivered"], default: "pending"},
+        passedToVendors: [{ type: mongoose.Schema.Types.ObjectId, ref: "User", default: [] }]
       },
     ],
     total: { type: Number, required: true },

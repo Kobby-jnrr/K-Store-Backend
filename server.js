@@ -9,15 +9,6 @@ import orderRoutes from "./routes/orderRoutes.js";
 import testRoutes from "./routes/test.js";
 import adminRoutes from "./routes/adminRoutes.js";
 
-app.use(cors({
-    origin: [
-      "http://localhost:5173",           // your dev frontend
-      "https://k-store-frontend.vercel.app", // your deployed frontend
-    ],
-    credentials: true,
-  })
-);
-
 dotenv.config();
 connectDB();
 

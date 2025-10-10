@@ -2,6 +2,7 @@ import express from "express";
 import { verifyToken, verifyAdmin } from "../middleware/authMiddleware.js";
 import User from "../models/user.js";
 import Product from "../models/product.js";
+import Order from "../models/order.js";
 
 const router = express.Router();
 
@@ -115,6 +116,49 @@ router.delete("/products/:id", verifyToken, verifyAdmin, async (req, res) => {
   } catch (error) {
     console.error("Error deleting product:", error);
     res.status(500).json({ message: "Failed to delete product" });
+  }
+});
+
+/* ------------------ ORDERS ------------------ */
+// Get all orders
+router.get("/orders", verifyToken, verifyAdmin, async (req, res) => {
+  try {
+    const orders = await Order.find()
+      .populate("user", "username email") // matches your schema
+      .populate("items.product", "title price")
+      .populate("items.vendor", "username email"); // optional vendor info
+
+    res.status(200).json(orders);
+  } catch (error) {
+    console.error("Error fetching orders:", error);
+    res.status(500).json({ message: "Failed to fetch orders" });
+  }
+});
+
+// Update order status
+router.put("/orders/:id", verifyToken, verifyAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    const order = await Order.findByIdAndUpdate(id, { status }, { new: true });
+    if (!order) return res.status(404).json({ message: "Order not found" });
+    res.status(200).json({ message: "Order updated", order });
+  } catch (error) {
+    console.error("Error updating order:", error);
+    res.status(500).json({ message: "Failed to update order" });
+  }
+});
+
+// Delete an order
+router.delete("/orders/:id", verifyToken, verifyAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deletedOrder = await Order.findByIdAndDelete(id);
+    if (!deletedOrder) return res.status(404).json({ message: "Order not found" });
+    res.status(200).json({ message: "Order deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting order:", error);
+    res.status(500).json({ message: "Failed to delete order" });
   }
 });
 

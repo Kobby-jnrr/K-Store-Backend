@@ -1,21 +1,16 @@
 import { verifyToken } from "./verifyToken.js";
 import User from "../models/user.js";
 
-// ✅ Re-export verifyToken so other files can import it from here
+// Re-export verifyToken
 export { verifyToken };
 
-/**
- * ✅ Verify Vendor Access
- * Allows only users with role === 'vendor'
- */
+// ✅ Vendor middleware (all vendors allowed, verified not required)
 export const verifyVendor = async (req, res, next) => {
   try {
     const user = req.user || (await User.findById(req.user._id));
-
     if (!user || user.role !== "vendor") {
       return res.status(403).json({ message: "Access denied. Vendors only." });
     }
-
     next();
   } catch (error) {
     console.error("Vendor verification error:", error);
@@ -23,18 +18,13 @@ export const verifyVendor = async (req, res, next) => {
   }
 };
 
-/**
- * ✅ Verify Admin Access
- * Allows only users with role === 'admin'
- */
+// ✅ Admin middleware
 export const verifyAdmin = async (req, res, next) => {
   try {
     const user = req.user || (await User.findById(req.user._id));
-
     if (!user || user.role !== "admin") {
       return res.status(403).json({ message: "Access denied. Admins only." });
     }
-
     next();
   } catch (error) {
     console.error("Admin verification error:", error);

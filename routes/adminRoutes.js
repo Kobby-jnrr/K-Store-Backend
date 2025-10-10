@@ -1,7 +1,7 @@
 import express from "express";
 import { verifyToken, verifyAdmin } from "../middleware/authMiddleware.js";
 import User from "../models/user.js";
-import Product from "../models/product.js"; // Make sure you have a Product model
+import Product from "../models/product.js";
 
 const router = express.Router();
 
@@ -35,6 +35,11 @@ router.put("/verify-vendor/:id", verifyToken, verifyAdmin, async (req, res) => {
     }
 
     vendor.verified = verified;
+
+    // Append or remove ✅
+    const baseUsername = vendor.username.replace(/ ✅$/, "");
+    vendor.username = verified ? `${baseUsername} ✅` : baseUsername;
+
     await vendor.save();
 
     res.status(200).json({
@@ -48,7 +53,6 @@ router.put("/verify-vendor/:id", verifyToken, verifyAdmin, async (req, res) => {
 });
 
 /* ------------------ USERS ------------------ */
-// Get all users (excluding admins)
 router.get("/users", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const users = await User.find({ role: { $ne: "admin" } }).select("-password");
@@ -59,7 +63,6 @@ router.get("/users", verifyToken, verifyAdmin, async (req, res) => {
   }
 });
 
-// Update user role (customer <-> vendor)
 router.put("/update-user-role/:id", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const { id } = req.params;
@@ -79,7 +82,6 @@ router.put("/update-user-role/:id", verifyToken, verifyAdmin, async (req, res) =
 });
 
 /* ------------------ PRODUCTS ------------------ */
-// Get all products (admin)
 router.get("/products", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const products = await Product.find().populate("vendor", "username email");
@@ -90,7 +92,6 @@ router.get("/products", verifyToken, verifyAdmin, async (req, res) => {
   }
 });
 
-// Update a product (admin)
 router.put("/products/:id", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const { id } = req.params;
@@ -104,7 +105,6 @@ router.put("/products/:id", verifyToken, verifyAdmin, async (req, res) => {
   }
 });
 
-// Delete a product (admin)
 router.delete("/products/:id", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const { id } = req.params;

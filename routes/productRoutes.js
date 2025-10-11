@@ -1,17 +1,26 @@
 import express from "express";
 import Product from "../models/product.js";
 import { verifyToken, verifyVendor } from "../middleware/authMiddleware.js";
-import User from "../models/user.js";
+import { v2 as cloudinary } from "cloudinary";
+import multer from "multer";
 
 const router = express.Router();
 
-/* =====================================================
-   GET all products (with vendor info)
-===================================================== */
+// -------------------- MULTER CONFIG --------------------
+const storage = multer.memoryStorage();
+const upload = multer({ storage });
+
+// -------------------- CLOUDINARY CONFIG --------------------
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+// -------------------- GET ALL PRODUCTS --------------------
 router.get("/", async (req, res) => {
   try {
     const products = await Product.find().populate("vendor", "username verified");
-    // Map vendor fields for frontend convenience
     const result = products.map((p) => ({
       ...p.toObject(),
       vendorName: p.vendor?.username || "Unknown",
@@ -23,63 +32,64 @@ router.get("/", async (req, res) => {
   }
 });
 
-/* =====================================================
-   GET products of the logged-in vendor
-===================================================== */
+// -------------------- GET VENDOR PRODUCTS --------------------
 router.get("/vendor", verifyToken, verifyVendor, async (req, res) => {
   try {
     const products = await Product.find({ vendor: req.user._id }).populate("vendor", "username verified");
-    
-    const result = products.map(p => ({
+    const result = products.map((p) => ({
       ...p.toObject(),
       vendorName: p.vendor?.username || "Unknown",
       vendorVerified: p.vendor?.verified || false,
     }));
-
     res.json(result);
   } catch (err) {
     res.status(500).json({ message: "Error fetching vendor products", error: err.message });
   }
 });
 
-
-/* =====================================================
-   GET products by category
-===================================================== */
+// -------------------- GET PRODUCTS BY CATEGORY --------------------
 router.get("/:category", async (req, res) => {
   try {
     const { category } = req.params;
-    const products = await Product.find({ category: new RegExp(`^${category}$`, "i") })
-                                  .populate("vendor", "username verified");
-
+    const products = await Product.find({ category: new RegExp(`^${category}$`, "i") }).populate(
+      "vendor",
+      "username verified"
+    );
     const result = products.map((p) => ({
       ...p.toObject(),
       vendorName: p.vendor?.username || "Unknown",
       vendorVerified: p.vendor?.verified || false,
     }));
-
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-/* =====================================================
-   ADD new product (vendor only)
-===================================================== */
-router.post("/", verifyToken, verifyVendor, async (req, res) => {
+// -------------------- ADD NEW PRODUCT (VENDOR ONLY) --------------------
+router.post("/", verifyToken, verifyVendor, upload.single("image"), async (req, res) => {
   try {
-    const { title, price, image, category, description } = req.body;
-    if (!title || !price || !image || !category) {
+    const { title, price, category, description } = req.body;
+
+    if (!title || !price || !category || !req.file) {
       return res.status(400).json({ message: "Missing required fields" });
     }
+
+    // Upload image to Cloudinary
+    const result = await new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream({ folder: "kstore_products" }, (error, result) => {
+        if (error) reject(error);
+        else resolve(result);
+      });
+      stream.end(req.file.buffer);
+    });
 
     const product = new Product({
       title,
       price,
-      image,
       category: category.toLowerCase(),
       description,
+      image: result.secure_url,
       vendor: req.user._id,
     });
 
@@ -99,10 +109,8 @@ router.post("/", verifyToken, verifyVendor, async (req, res) => {
   }
 });
 
-/* =====================================================
-   UPDATE product (vendor only)
-===================================================== */
-router.put("/:id", verifyToken, verifyVendor, async (req, res) => {
+// -------------------- UPDATE PRODUCT (VENDOR ONLY) --------------------
+router.put("/:id", verifyToken, verifyVendor, upload.single("image"), async (req, res) => {
   try {
     const { id } = req.params;
     const product = await Product.findById(id);
@@ -110,6 +118,18 @@ router.put("/:id", verifyToken, verifyVendor, async (req, res) => {
 
     if (product.vendor.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: "Not authorized to update this product" });
+    }
+
+    // If image file exists, upload to Cloudinary
+    if (req.file) {
+      const result = await new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream({ folder: "kstore_products" }, (error, result) => {
+          if (error) reject(error);
+          else resolve(result);
+        });
+        stream.end(req.file.buffer);
+      });
+      req.body.image = result.secure_url;
     }
 
     Object.assign(product, req.body);
@@ -129,9 +149,7 @@ router.put("/:id", verifyToken, verifyVendor, async (req, res) => {
   }
 });
 
-/* =====================================================
-   DELETE product (vendor only)
-===================================================== */
+// -------------------- DELETE PRODUCT (VENDOR ONLY) --------------------
 router.delete("/:id", verifyToken, verifyVendor, async (req, res) => {
   try {
     const { id } = req.params;

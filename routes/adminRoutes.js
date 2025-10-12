@@ -37,7 +37,6 @@ router.put("/verify-vendor/:id", verifyToken, verifyAdmin, async (req, res) => {
 
     vendor.verified = verified;
 
-    // Append or remove ✅
     const baseUsername = vendor.username.replace(/ ✅$/, "");
     vendor.username = verified ? `${baseUsername} ✅` : baseUsername;
 
@@ -54,6 +53,7 @@ router.put("/verify-vendor/:id", verifyToken, verifyAdmin, async (req, res) => {
 });
 
 /* ------------------ USERS ------------------ */
+// Get all users
 router.get("/users", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const users = await User.find({ role: { $ne: "admin" } }).select("-password");
@@ -64,6 +64,36 @@ router.get("/users", verifyToken, verifyAdmin, async (req, res) => {
   }
 });
 
+// Add a user
+router.post("/users", verifyToken, verifyAdmin, async (req, res) => {
+  try {
+    const { username, email, password, role } = req.body;
+
+    if (!username || !email || !password) {
+      return res.status(400).json({ message: "Username, email, and password are required" });
+    }
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: "User with this email already exists" });
+    }
+
+    const newUser = new User({
+      username,
+      email,
+      password, // ensure password hashing happens in User model pre-save
+      role: role || "customer",
+    });
+
+    await newUser.save();
+    res.status(201).json({ message: "User created successfully", user: newUser });
+  } catch (error) {
+    console.error("Error adding user:", error);
+    res.status(500).json({ message: "Failed to add user" });
+  }
+});
+
+// Update user role
 router.put("/update-user-role/:id", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const { id } = req.params;
@@ -79,6 +109,24 @@ router.put("/update-user-role/:id", verifyToken, verifyAdmin, async (req, res) =
   } catch (error) {
     console.error("Error updating user role:", error);
     res.status(500).json({ message: "Failed to update user role" });
+  }
+});
+
+// Delete a user
+router.delete("/users/:id", verifyToken, verifyAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const user = await User.findById(id);
+    if (!user || user.role === "admin") {
+      return res.status(404).json({ message: "User not found or cannot delete admin" });
+    }
+
+    await User.findByIdAndDelete(id);
+    res.status(200).json({ message: "User deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting user:", error);
+    res.status(500).json({ message: "Failed to delete user" });
   }
 });
 
@@ -120,13 +168,12 @@ router.delete("/products/:id", verifyToken, verifyAdmin, async (req, res) => {
 });
 
 /* ------------------ ORDERS ------------------ */
-// Get all orders
 router.get("/orders", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const orders = await Order.find()
-      .populate("user", "username email") // matches your schema
+      .populate("user", "username email")
       .populate("items.product", "title price")
-      .populate("items.vendor", "username email"); // optional vendor info
+      .populate("items.vendor", "username email");
 
     res.status(200).json(orders);
   } catch (error) {
@@ -135,13 +182,13 @@ router.get("/orders", verifyToken, verifyAdmin, async (req, res) => {
   }
 });
 
-// Update order status
 router.put("/orders/:id", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
     const order = await Order.findByIdAndUpdate(id, { status }, { new: true });
     if (!order) return res.status(404).json({ message: "Order not found" });
+
     res.status(200).json({ message: "Order updated", order });
   } catch (error) {
     console.error("Error updating order:", error);
@@ -149,12 +196,12 @@ router.put("/orders/:id", verifyToken, verifyAdmin, async (req, res) => {
   }
 });
 
-// Delete an order
 router.delete("/orders/:id", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const deletedOrder = await Order.findByIdAndDelete(id);
     if (!deletedOrder) return res.status(404).json({ message: "Order not found" });
+
     res.status(200).json({ message: "Order deleted successfully" });
   } catch (error) {
     console.error("Error deleting order:", error);

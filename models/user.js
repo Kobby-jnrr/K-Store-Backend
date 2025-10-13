@@ -22,13 +22,25 @@ const userSchema = new mongoose.Schema(
       enum: ["customer", "vendor", "admin"],
       default: "customer",
     },
-    // ✅ Add this field for admin verification of vendors
+    phone: {
+      type: String,
+      default: "", 
+    },
+    location: {
+      type: String,
+      default: "",
+    },
+    businessName: {
+      type: String,
+      default: "", 
+    },
     verified: {
       type: Boolean,
-      default: false,
+      default: false, // for admin verification of vendors
     },
     refreshToken: {
-      type: String },
+      type: String,
+    },
   },
   { timestamps: true }
 );

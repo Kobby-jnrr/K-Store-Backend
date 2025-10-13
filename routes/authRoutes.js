@@ -12,75 +12,139 @@ const generateTokens = (user) => {
     process.env.JWT_SECRET,
     { expiresIn: "3h" }
   );
-
   const refreshToken = jwt.sign(
     { id: user._id },
     process.env.JWT_REFRESH_SECRET,
     { expiresIn: "7d" }
   );
-
   return { accessToken, refreshToken };
 };
 
-// REGISTER
+// ---------------- REGISTER ----------------
 router.post("/register", async (req, res) => {
   try {
-    const { username, email, password, role } = req.body;
+    const { username, email, password, role, phone, location, businessName } = req.body;
+
+    // Check if user exists
     const existing = await User.findOne({ email });
     if (existing) return res.status(400).json({ msg: "User already exists" });
 
+    // Hash password
     const hashed = await bcrypt.hash(password, 10);
+
+    // Create user with extra info
     const user = await User.create({
       username,
       email,
       password: hashed,
       role: role || "customer",
+      phone: phone || "",
+      location: location || "",
+      businessName: businessName || "",
     });
 
-    res.json({ message: "User registered", user });
+    // Generate tokens
+    const { accessToken, refreshToken } = generateTokens(user);
+    user.refreshToken = refreshToken;
+    await user.save();
+
+    res.status(201).json({
+      message: "User registered",
+      accessToken,
+      refreshToken,
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        phone: user.phone,
+        location: user.location,
+        businessName: user.businessName,
+      },
+    });
   } catch (err) {
+    console.error("❌ Registration error:", err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// LOGIN
+// ---------------- LOGIN ----------------
 router.post("/login", async (req, res) => {
-  const { email, password } = req.body;
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) return res.status(400).json({ msg: "Please provide all fields" });
 
-  if (!email || !password)
-    return res.status(400).json({ msg: "Please provide all fields" });
+    const user = await User.findOne({ email });
+    if (!user) return res.status(400).json({ msg: "Invalid credentials" });
 
-  const user = await User.findOne({ email });
-  if (!user) return res.status(400).json({ msg: "Invalid credentials" });
+    const match = await bcrypt.compare(password, user.password);
+    if (!match) return res.status(400).json({ msg: "Invalid credentials" });
 
-  const match = await bcrypt.compare(password, user.password);
-  if (!match) return res.status(400).json({ msg: "Invalid credentials" });
+    const { accessToken, refreshToken } = generateTokens(user);
+    user.refreshToken = refreshToken;
+    await user.save();
 
-  const { accessToken, refreshToken } = generateTokens(user);
-
-  // Save refresh token to DB
-  user.refreshToken = refreshToken;
-  await user.save();
-
-  res.json({
-    accessToken,
-    refreshToken,
-    user: { id: user._id, username: user.username, role: user.role },
-  });
+    res.json({
+      accessToken,
+      refreshToken,
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        phone: user.phone,
+        location: user.location,
+        businessName: user.businessName,
+      },
+    });
+  } catch (err) {
+    console.error("❌ Login error:", err);
+    res.status(500).json({ msg: err.message });
+  }
 });
 
-// REFRESH TOKEN
+// ---------------- UPDATE USER INFO ----------------
+router.put("/update/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { phone, location, businessName } = req.body;
+
+    const user = await User.findById(id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    if (phone !== undefined) user.phone = phone;
+    if (location !== undefined) user.location = location;
+    if (businessName !== undefined) user.businessName = businessName;
+
+    await user.save();
+
+    res.status(200).json({
+      message: "User info updated successfully",
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        phone: user.phone,
+        location: user.location,
+        businessName: user.businessName,
+      },
+    });
+  } catch (err) {
+    console.error("❌ Update error:", err);
+    res.status(500).json({ message: "Failed to update user info" });
+  }
+});
+
+// ---------------- REFRESH TOKEN ----------------
 router.post("/refresh", async (req, res) => {
   const { refreshToken } = req.body;
-  if (!refreshToken)
-    return res.status(401).json({ msg: "Refresh token required" });
+  if (!refreshToken) return res.status(401).json({ msg: "Refresh token required" });
 
   try {
     const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
     const user = await User.findById(decoded.id);
-
-    if (!user || user.refreshToken !== refreshToken)
-      return res.status(403).json({ msg: "Invalid refresh token" });
+    if (!user || user.refreshToken !== refreshToken) return res.status(403).json({ msg: "Invalid refresh token" });
 
     const { accessToken, refreshToken: newRefresh } = generateTokens(user);
     user.refreshToken = newRefresh;
@@ -92,16 +156,14 @@ router.post("/refresh", async (req, res) => {
   }
 });
 
-// LOGOUT
+// ---------------- LOGOUT ----------------
 router.post("/logout", async (req, res) => {
   const { refreshToken } = req.body;
-  if (!refreshToken)
-    return res.status(400).json({ msg: "Refresh token required" });
+  if (!refreshToken) return res.status(400).json({ msg: "Refresh token required" });
 
   try {
     const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
     const user = await User.findById(decoded.id);
-
     if (!user) return res.status(404).json({ msg: "User not found" });
 
     user.refreshToken = null;
@@ -113,15 +175,12 @@ router.post("/logout", async (req, res) => {
   }
 });
 
-// ✅ Check user verification status
+// ---------------- USER STATUS ----------------
 router.get("/status/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const user = await User.findById(id).select("username email verified role phone location");
-
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
+    const user = await User.findById(id).select("username email verified role phone location businessName");
+    if (!user) return res.status(404).json({ message: "User not found" });
 
     res.status(200).json({
       verified: user.verified,
@@ -130,6 +189,7 @@ router.get("/status/:id", async (req, res) => {
       email: user.email,
       phone: user.phone || "Not added yet",
       location: user.location || "No location set",
+      businessName: user.businessName || "Not added yet",
     });
   } catch (err) {
     console.error("❌ Error fetching user status:", err);

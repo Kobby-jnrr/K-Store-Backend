@@ -1,5 +1,6 @@
 import express from "express";
 import Order from "../models/order.js";
+import User from "../models/user.js";
 import { verifyToken } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
@@ -7,7 +8,10 @@ const router = express.Router();
 /* ===================== CREATE ORDER ===================== */
 router.post("/", verifyToken, async (req, res) => {
   try {
-    const { items, total, paymentMethod, momoNumber, cardDetails } = req.body;
+    const { items, total, paymentMethod, momoNumber, fulfillmentType } = req.body;
+
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ error: "User not found" });
 
     const order = new Order({
       user: req.user.id,
@@ -15,7 +19,9 @@ router.post("/", verifyToken, async (req, res) => {
       total,
       paymentMethod,
       momoNumber,
-      cardDetails,
+      fulfillmentType,
+      phone: user.phone || "",
+      location: user.location || "",
     });
 
     await order.save();
@@ -45,13 +51,11 @@ router.get("/vendor-orders", verifyToken, async (req, res) => {
   try {
     const vendorId = req.user.id;
 
-    // Find all orders that include items for this vendor
     const orders = await Order.find({ "items.vendor": vendorId })
-      .populate("user", "username email")
-      .populate("items.product", "title price")
+      .populate("user", "username email phone location")
+      .populate("items.product", "title price image")
       .populate("items.vendor", "username");
 
-    // Filter items to only include those for this vendor
     const vendorOrders = orders.map((order) => {
       const vendorItems = order.items.filter(
         (item) => item.vendor._id.toString() === vendorId.toString()
@@ -64,6 +68,9 @@ router.get("/vendor-orders", verifyToken, async (req, res) => {
         total: vendorItems.reduce((sum, i) => sum + i.price * i.quantity, 0),
         status: order.status,
         paymentMethod: order.paymentMethod,
+        fulfillmentType: order.fulfillmentType,
+        phone: order.phone,
+        location: order.location,
         createdAt: order.createdAt,
       };
     });
@@ -74,8 +81,8 @@ router.get("/vendor-orders", verifyToken, async (req, res) => {
     res.status(500).json({ error: "Failed to fetch vendor orders" });
   }
 });
+
 /* ===================== UPDATE VENDOR ITEM STATUS ===================== */
-// routes/orderRoutes.js
 router.put("/vendor-orders/:orderId/item/:itemId", verifyToken, async (req, res) => {
   try {
     const { orderId, itemId } = req.params;
@@ -88,20 +95,26 @@ router.put("/vendor-orders/:orderId/item/:itemId", verifyToken, async (req, res)
     const item = order.items.id(itemId);
     if (!item) return res.status(404).json({ error: "Item not found" });
 
-    if (item.vendor.toString() !== vendorId) {
+    if (item.vendor.toString() !== vendorId)
       return res.status(403).json({ error: "Not authorized" });
-    }
 
-    const validStatuses = ["pending", "accepted", "rejected", "preparing", "ready", "delivered"];
-    if (!validStatuses.includes(status)) return res.status(400).json({ error: "Invalid status" });
+    const validStatuses = [
+      "pending",
+      "accepted",
+      "rejected",
+      "preparing",
+      "ready",
+      "delivered",
+    ];
+    if (!validStatuses.includes(status))
+      return res.status(400).json({ error: "Invalid status" });
 
     item.status = status;
 
-    // 🔹 Update overall order status based on vendor items
-    const allStatuses = order.items.map(i => i.status);
-
-    if (allStatuses.every(s => s === "delivered")) order.status = "delivered";
-    else if (allStatuses.some(s => ["ready", "preparing", "accepted"].includes(s))) order.status = "confirmed";
+    const allStatuses = order.items.map((i) => i.status);
+    if (allStatuses.every((s) => s === "delivered")) order.status = "delivered";
+    else if (allStatuses.some((s) => ["ready", "preparing", "accepted"].includes(s)))
+      order.status = "confirmed";
     else order.status = "pending";
 
     await order.save();
@@ -109,26 +122,7 @@ router.put("/vendor-orders/:orderId/item/:itemId", verifyToken, async (req, res)
     res.json({ message: "Item status updated", item, orderStatus: order.status });
   } catch (err) {
     console.error("Failed to update item status:", err);
-    res.status(500).json({ error: "Failed to update item status", details: err.message });
-  }
-});
-
-// POST /api/admin/orders/:orderId/pass
-router.post("/orders/:orderId/pass", verifyToken, async (req, res) => {
-  try {
-    const { vendorId } = req.body;
-    const order = await Order.findById(req.params.orderId);
-    if (!order) return res.status(404).json({ error: "Order not found" });
-
-    if (!order.passedToVendors) order.passedToVendors = [];
-    if (!order.passedToVendors.includes(vendorId)) {
-      order.passedToVendors.push(vendorId);
-    }
-
-    await order.save();
-    res.json({ message: "Order passed to vendor", order });
-  } catch (err) {
-    res.status(500).json({ error: "Failed to pass order" });
+    res.status(500).json({ error: "Failed to update item status" });
   }
 });
 

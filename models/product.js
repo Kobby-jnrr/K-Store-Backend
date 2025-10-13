@@ -4,6 +4,8 @@ const productSchema = new mongoose.Schema(
   {
     title: { type: String, required: true, trim: true },
     price: { type: Number, required: true, min: 0 },
+
+    // Expanded categories
     category: {
       type: String,
       required: true,
@@ -17,20 +19,39 @@ const productSchema = new mongoose.Schema(
         "baby",
         "beauty",
         "sports",
-        "gaming"
-      ], // optional: you can add more
+        "gaming",
+        "books",
+        "toys",
+        "automotive",
+        "jewelry",
+        "health",
+        "pets",
+        "office",
+        "tools",
+        "garden",
+        "music",
+        "movies",
+        "appliances",
+        "footwear",
+        "accessories",
+        "outdoor",
+        "art",
+        "other",
+      ],
     },
+
     image: { type: String, required: true },
+    cloudinary_id: { type: String }, // store Cloudinary public_id
     description: { type: String, trim: true },
 
-    // ✅ NEW FIELD — track if product is active/sold/pending
+    // Track product status
     status: {
       type: String,
       enum: ["active", "sold", "pending", "hidden"],
       default: "active",
     },
 
-    // ✅ Vendor reference
+    // Vendor reference
     vendor: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -40,7 +61,7 @@ const productSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Optional: automatically lowercase category before saving
+// Automatically lowercase category before saving
 productSchema.pre("save", function (next) {
   if (this.category) this.category = this.category.toLowerCase();
   next();

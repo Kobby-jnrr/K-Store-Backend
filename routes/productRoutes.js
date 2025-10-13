@@ -35,7 +35,10 @@ router.get("/", async (req, res) => {
 // -------------------- GET VENDOR PRODUCTS --------------------
 router.get("/vendor", verifyToken, verifyVendor, async (req, res) => {
   try {
-    const products = await Product.find({ vendor: req.user._id }).populate("vendor", "username verified");
+    const products = await Product.find({ vendor: req.user._id }).populate(
+      "vendor",
+      "username verified"
+    );
     const result = products.map((p) => ({
       ...p.toObject(),
       vendorName: p.vendor?.username || "Unknown",
@@ -77,10 +80,13 @@ router.post("/", verifyToken, verifyVendor, upload.single("image"), async (req, 
 
     // Upload image to Cloudinary
     const result = await new Promise((resolve, reject) => {
-      const stream = cloudinary.uploader.upload_stream({ folder: "kstore_products" }, (error, result) => {
-        if (error) reject(error);
-        else resolve(result);
-      });
+      const stream = cloudinary.uploader.upload_stream(
+        { folder: "kstore_products" },
+        (error, result) => {
+          if (error) reject(error);
+          else resolve(result);
+        }
+      );
       stream.end(req.file.buffer);
     });
 
@@ -90,6 +96,7 @@ router.post("/", verifyToken, verifyVendor, upload.single("image"), async (req, 
       category: category.toLowerCase(),
       description,
       image: result.secure_url,
+      cloudinary_id: result.public_id,
       vendor: req.user._id,
     });
 
@@ -120,16 +127,26 @@ router.put("/:id", verifyToken, verifyVendor, upload.single("image"), async (req
       return res.status(403).json({ message: "Not authorized to update this product" });
     }
 
-    // If image file exists, upload to Cloudinary
     if (req.file) {
+      // Delete old image from Cloudinary
+      if (product.cloudinary_id) {
+        await cloudinary.uploader.destroy(product.cloudinary_id);
+      }
+
+      // Upload new image
       const result = await new Promise((resolve, reject) => {
-        const stream = cloudinary.uploader.upload_stream({ folder: "kstore_products" }, (error, result) => {
-          if (error) reject(error);
-          else resolve(result);
-        });
+        const stream = cloudinary.uploader.upload_stream(
+          { folder: "kstore_products" },
+          (error, result) => {
+            if (error) reject(error);
+            else resolve(result);
+          }
+        );
         stream.end(req.file.buffer);
       });
+
       req.body.image = result.secure_url;
+      req.body.cloudinary_id = result.public_id;
     }
 
     Object.assign(product, req.body);
@@ -160,8 +177,13 @@ router.delete("/:id", verifyToken, verifyVendor, async (req, res) => {
       return res.status(403).json({ message: "Not authorized to delete this product" });
     }
 
+    // Delete image from Cloudinary
+    if (product.cloudinary_id) {
+      await cloudinary.uploader.destroy(product.cloudinary_id);
+    }
+
     await product.deleteOne();
-    res.json({ message: "Product deleted successfully" });
+    res.json({ message: "Product and image deleted successfully" });
   } catch (err) {
     res.status(500).json({ message: "Error deleting product", error: err.message });
   }

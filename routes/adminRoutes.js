@@ -15,6 +15,7 @@ router.get("/dashboard", verifyToken, verifyAdmin, (req, res) => {
 });
 
 /* ------------------ VENDORS ------------------ */
+// Get all vendors
 router.get("/vendors", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const vendors = await User.find({ role: "vendor" }).select("-password");
@@ -25,27 +26,22 @@ router.get("/vendors", verifyToken, verifyAdmin, async (req, res) => {
   }
 });
 
+// Verify / unverify vendor
 router.put("/verify-vendor/:id", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { verified } = req.body;
 
     const vendor = await User.findById(id);
-    if (!vendor || vendor.role !== "vendor") {
+    if (!vendor || vendor.role !== "vendor")
       return res.status(404).json({ message: "Vendor not found" });
-    }
 
     vendor.verified = verified;
-
     const baseUsername = vendor.username.replace(/ ✅$/, "");
     vendor.username = verified ? `${baseUsername} ✅` : baseUsername;
 
     await vendor.save();
-
-    res.status(200).json({
-      message: `Vendor ${verified ? "verified" : "unverified"} successfully`,
-      vendor,
-    });
+    res.status(200).json({ message: `Vendor ${verified ? "verified" : "unverified"} successfully`, vendor });
   } catch (error) {
     console.error("Error verifying vendor:", error);
     res.status(500).json({ message: "Error verifying vendor" });
@@ -53,7 +49,7 @@ router.put("/verify-vendor/:id", verifyToken, verifyAdmin, async (req, res) => {
 });
 
 /* ------------------ USERS ------------------ */
-// Get all users
+// Get all users (excluding admins)
 router.get("/users", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const users = await User.find({ role: { $ne: "admin" } }).select("-password");
@@ -64,28 +60,21 @@ router.get("/users", verifyToken, verifyAdmin, async (req, res) => {
   }
 });
 
-// Add a user
+// Add a new user
 router.post("/users", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const { username, email, password, role } = req.body;
 
-    if (!username || !email || !password) {
+    if (!username || !email || !password)
       return res.status(400).json({ message: "Username, email, and password are required" });
-    }
 
     const existingUser = await User.findOne({ email });
-    if (existingUser) {
+    if (existingUser)
       return res.status(400).json({ message: "User with this email already exists" });
-    }
 
-    const newUser = new User({
-      username,
-      email,
-      password, // ensure password hashing happens in User model pre-save
-      role: role || "customer",
-    });
-
+    const newUser = new User({ username, email, password, role: role || "customer" });
     await newUser.save();
+
     res.status(201).json({ message: "User created successfully", user: newUser });
   } catch (error) {
     console.error("Error adding user:", error);
@@ -100,7 +89,8 @@ router.put("/update-user-role/:id", verifyToken, verifyAdmin, async (req, res) =
     const { role } = req.body;
 
     const user = await User.findById(id);
-    if (!user || user.role === "admin") return res.status(404).json({ message: "User not found" });
+    if (!user || user.role === "admin")
+      return res.status(404).json({ message: "User not found or cannot update admin" });
 
     user.role = role;
     await user.save();
@@ -112,14 +102,18 @@ router.put("/update-user-role/:id", verifyToken, verifyAdmin, async (req, res) =
   }
 });
 
-// Delete a user
+// Delete a user (auto delete vendor products if vendor)
 router.delete("/users/:id", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const { id } = req.params;
 
     const user = await User.findById(id);
-    if (!user || user.role === "admin") {
+    if (!user || user.role === "admin")
       return res.status(404).json({ message: "User not found or cannot delete admin" });
+
+    // If vendor, delete all their products
+    if (user.role === "vendor") {
+      await Product.deleteMany({ vendor: id });
     }
 
     await User.findByIdAndDelete(id);
@@ -131,6 +125,7 @@ router.delete("/users/:id", verifyToken, verifyAdmin, async (req, res) => {
 });
 
 /* ------------------ PRODUCTS ------------------ */
+// Get all products
 router.get("/products", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const products = await Product.find().populate("vendor", "username email");
@@ -141,6 +136,7 @@ router.get("/products", verifyToken, verifyAdmin, async (req, res) => {
   }
 });
 
+// Update a product
 router.put("/products/:id", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const { id } = req.params;
@@ -154,6 +150,7 @@ router.put("/products/:id", verifyToken, verifyAdmin, async (req, res) => {
   }
 });
 
+// Delete a product
 router.delete("/products/:id", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const { id } = req.params;
@@ -168,6 +165,7 @@ router.delete("/products/:id", verifyToken, verifyAdmin, async (req, res) => {
 });
 
 /* ------------------ ORDERS ------------------ */
+// Get all orders
 router.get("/orders", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const orders = await Order.find()
@@ -182,6 +180,7 @@ router.get("/orders", verifyToken, verifyAdmin, async (req, res) => {
   }
 });
 
+// Update order status
 router.put("/orders/:id", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const { id } = req.params;
@@ -196,6 +195,7 @@ router.put("/orders/:id", verifyToken, verifyAdmin, async (req, res) => {
   }
 });
 
+// Delete an order
 router.delete("/orders/:id", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const { id } = req.params;

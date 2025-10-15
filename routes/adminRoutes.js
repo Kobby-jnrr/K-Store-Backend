@@ -237,12 +237,15 @@ router.get("/promo", verifyToken, verifyAdmin, async (req, res) => {
 // Set a new promo
 router.post("/promo", verifyToken, verifyAdmin, async (req, res) => {
   try {
-    const { vendorIds, durationHours } = req.body;
+    const { vendorIds, durationWeeks } = req.body;
 
     if (!vendorIds || !vendorIds.length)
       return res.status(400).json({ message: "Select at least one vendor" });
 
-    const promo = new Promo({ vendorIds, durationHours });
+    if (![1, 2, 3, 4].includes(durationWeeks))
+      return res.status(400).json({ message: "Duration must be 1, 2, 3, or 4 weeks" });
+
+    const promo = new Promo({ vendorIds, durationWeeks });
     await promo.save();
 
     res.status(201).json({ message: "Promo saved", promo });

@@ -8,6 +8,7 @@ import cartRoutes from "./routes/cartRoutes.js";
 import orderRoutes from "./routes/orderRoutes.js";
 import testRoutes from "./routes/test.js";
 import adminRoutes from "./routes/adminRoutes.js";
+import promoRoutes from "./routes/promoRoutes.js";
 
 dotenv.config();
 connectDB();
@@ -20,6 +21,7 @@ app.use("/api/test", testRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/promo", promoRoutes);
 app.use("/api/cart", cartRoutes);
 app.use("/api/orders", orderRoutes);
 

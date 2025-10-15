@@ -16,7 +16,7 @@ router.get("/", async (req, res) => {
 
     const products = await Product.aggregate([
       { $match: { vendor: { $in: promo.vendorIds } } },
-      { $sample: { size: 7 } },
+      { $sample: { size: 30 } },
     ]);
 
     res.status(200).json({ vendorIds: promo.vendorIds, durationWeeks: promo.durationWeeks, products });

@@ -210,35 +210,5 @@ router.delete("/orders/:id", verifyToken, verifyAdmin, async (req, res) => {
   }
 });
 
-// Get current promo
-router.get("/promo", async (req, res) => {
-  try {
-    const promo = await Promo.findOne().sort({ startDate: -1 }); // latest promo
-    if (!promo) return res.json({ vendorIds: [], durationWeeks: 2 });
-    res.json(promo);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
-  }
-});
-
-// Create or update promo
-router.post("/promo", async (req, res) => {
-  try {
-    const { vendorIds, durationWeeks } = req.body;
-
-    if (!vendorIds || !vendorIds.length) {
-      return res.status(400).json({ message: "vendorIds required" });
-    }
-
-    // Save new promo
-    const newPromo = new Promo({ vendorIds, durationWeeks });
-    await newPromo.save();
-    res.json(newPromo);
-  } catch (err) {
-    console.error(err);
-    res.status(400).json({ message: "Failed to save promo" });
-  }
-});
 
 export default router;

@@ -5,42 +5,47 @@ import { verifyToken, verifyAdmin } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// Get active promo and random products
+// -------------------- GET ACTIVE PROMO --------------------
 router.get("/", async (req, res) => {
   try {
-    // Find the latest active promo
     const promo = await Promo.findOne({ active: true }).sort({ startDate: -1 });
 
-    // No active promo or promo expired
     if (!promo || new Date() > promo.endDate) {
-      return res.status(200).json({ vendorIds: [], products: [] });
+      return res.status(200).json({ vendorIds: [], durationWeeks: 2, products: [] });
     }
 
-    // Random 6–7 products from all active vendors
     const products = await Product.aggregate([
       { $match: { vendor: { $in: promo.vendorIds } } },
       { $sample: { size: 7 } },
     ]);
 
-    res.status(200).json({ vendorIds: promo.vendorIds, products });
+    res.status(200).json({ vendorIds: promo.vendorIds, durationWeeks: promo.durationWeeks, products });
   } catch (err) {
     console.error("Error fetching promo:", err);
     res.status(500).json({ message: "Failed to fetch promo" });
   }
 });
 
-// Create / update promo for one or more vendors
+// -------------------- CREATE / UPDATE PROMO --------------------
 router.post("/", verifyToken, verifyAdmin, async (req, res) => {
   try {
-    const { vendorIds, durationWeeks } = req.body;
+    const { vendorIds = [], durationWeeks = 2 } = req.body;
 
-    if (!vendorIds || !vendorIds.length)
-      return res.status(400).json({ message: "Select at least one vendor" });
+    if (!Array.isArray(vendorIds)) {
+      return res.status(400).json({ message: "vendorIds must be an array" });
+    }
 
-    if (![1, 2, 3, 4].includes(durationWeeks))
+    if (![1, 2, 3, 4].includes(durationWeeks)) {
       return res.status(400).json({ message: "Duration must be 1-4 weeks" });
+    }
 
-    // Create new promo
+    // Deactivate all promos if vendorIds is empty
+    if (vendorIds.length === 0) {
+      await Promo.updateMany({ active: true }, { active: false });
+      return res.status(200).json({ message: "All promos removed", vendorIds: [] });
+    }
+
+    // Otherwise, create or update promo
     const promo = new Promo({
       vendorIds,
       durationWeeks,
@@ -56,7 +61,7 @@ router.post("/", verifyToken, verifyAdmin, async (req, res) => {
   }
 });
 
-// Deactivate a promo for a vendor
+// -------------------- REMOVE VENDOR FROM PROMO --------------------
 router.delete("/:vendorId", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const { vendorId } = req.params;
@@ -67,7 +72,7 @@ router.delete("/:vendorId", verifyToken, verifyAdmin, async (req, res) => {
     if (promo.vendorIds.length === 0) promo.active = false;
 
     await promo.save();
-    res.status(200).json({ message: "Promo deactivated" });
+    res.status(200).json({ message: "Vendor removed from promo", vendorIds: promo.vendorIds });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Failed to deactivate promo" });

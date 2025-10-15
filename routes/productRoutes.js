@@ -69,6 +69,27 @@ router.get("/:category", async (req, res) => {
   }
 });
 
+// GET PRODUCTS BY VENDOR (PUBLIC)
+router.get("/vendor/:vendorId", async (req, res) => {
+  try {
+    const products = await Product.find({ vendor: req.params.vendorId }).populate(
+      "vendor",
+      "username verified"
+    );
+
+    const result = products.map((p) => ({
+      ...p.toObject(),
+      vendorName: p.vendor?.username || "Unknown",
+      vendorVerified: p.vendor?.verified || false,
+      vendorId: p.vendor?._id || null,
+    }));
+
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ message: "Error fetching vendor products", error: err.message });
+  }
+});
+
 // -------------------- ADD NEW PRODUCT (VENDOR ONLY) --------------------
 router.post("/", verifyToken, verifyVendor, upload.single("image"), async (req, res) => {
   try {

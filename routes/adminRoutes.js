@@ -210,48 +210,34 @@ router.delete("/orders/:id", verifyToken, verifyAdmin, async (req, res) => {
   }
 });
 
-
-/* ------------------ PROMO ------------------ */
-// Get current active promo
-router.get("/promo", verifyToken, verifyAdmin, async (req, res) => {
+// Get current promo
+router.get("/promo", async (req, res) => {
   try {
-    const promo = await Promo.findOne().sort({ startTime: -1 });
-    if (!promo) return res.status(200).json({ vendorIds: [] });
-
-    // Check if promo expired
-    const endTime = new Date(promo.startTime);
-    endTime.setHours(endTime.getHours() + promo.durationHours);
-
-    if (new Date() > endTime) {
-      // Promo expired
-      return res.status(200).json({ vendorIds: [] });
-    }
-
-    res.status(200).json(promo);
+    const promo = await Promo.findOne().sort({ startDate: -1 }); // latest promo
+    if (!promo) return res.json({ vendorIds: [], durationWeeks: 2 });
+    res.json(promo);
   } catch (err) {
-    console.error("Error fetching promo:", err);
-    res.status(500).json({ message: "Failed to fetch promo" });
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
-// Set a new promo
-router.post("/promo", verifyToken, verifyAdmin, async (req, res) => {
+// Create or update promo
+router.post("/promo", async (req, res) => {
   try {
     const { vendorIds, durationWeeks } = req.body;
 
-    if (!vendorIds || !vendorIds.length)
-      return res.status(400).json({ message: "Select at least one vendor" });
+    if (!vendorIds || !vendorIds.length) {
+      return res.status(400).json({ message: "vendorIds required" });
+    }
 
-    if (![1, 2, 3, 4].includes(durationWeeks))
-      return res.status(400).json({ message: "Duration must be 1, 2, 3, or 4 weeks" });
-
-    const promo = new Promo({ vendorIds, durationWeeks });
-    await promo.save();
-
-    res.status(201).json({ message: "Promo saved", promo });
+    // Save new promo
+    const newPromo = new Promo({ vendorIds, durationWeeks });
+    await newPromo.save();
+    res.json(newPromo);
   } catch (err) {
-    console.error("Error saving promo:", err);
-    res.status(500).json({ message: "Failed to save promo" });
+    console.error(err);
+    res.status(400).json({ message: "Failed to save promo" });
   }
 });
 

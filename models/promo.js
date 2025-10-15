@@ -1,21 +1,26 @@
 import mongoose from "mongoose";
 
 const promoSchema = new mongoose.Schema({
-  vendorIds: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+  vendorIds: [{ type: mongoose.Schema.Types.ObjectId, ref: "User", required: true }],
   startDate: { type: Date, default: Date.now },
-  endDate: { type: Date }, // calculated automatically
   durationWeeks: { type: Number, enum: [1, 2, 3, 4], default: 2 },
-  active: { type: Boolean, default: true }
+  endDate: { type: Date },
+  active: { type: Boolean, default: true },
 });
 
-// Pre-save hook to calculate endDate
-promoSchema.pre("save", function (next) {
+// Pre-save: calculate endDate
+promoSchema.pre("save", function(next) {
   if (this.durationWeeks) {
     const end = new Date(this.startDate);
     end.setDate(end.getDate() + this.durationWeeks * 7);
     this.endDate = end;
   }
   next();
+});
+
+// Virtual: isActive
+promoSchema.virtual("isActive").get(function() {
+  return this.active && new Date() <= this.endDate;
 });
 
 export default mongoose.model("Promo", promoSchema);

@@ -3,6 +3,7 @@ import { verifyToken, verifyAdmin } from "../middleware/authMiddleware.js";
 import User from "../models/user.js";
 import Product from "../models/product.js";
 import Order from "../models/order.js";
+import Promo from "../models/promo.js";
 
 const router = express.Router();
 
@@ -206,6 +207,48 @@ router.delete("/orders/:id", verifyToken, verifyAdmin, async (req, res) => {
   } catch (error) {
     console.error("Error deleting order:", error);
     res.status(500).json({ message: "Failed to delete order" });
+  }
+});
+
+
+/* ------------------ PROMO ------------------ */
+// Get current active promo
+router.get("/promo", verifyToken, verifyAdmin, async (req, res) => {
+  try {
+    const promo = await Promo.findOne().sort({ startTime: -1 });
+    if (!promo) return res.status(200).json({ vendorIds: [] });
+
+    // Check if promo expired
+    const endTime = new Date(promo.startTime);
+    endTime.setHours(endTime.getHours() + promo.durationHours);
+
+    if (new Date() > endTime) {
+      // Promo expired
+      return res.status(200).json({ vendorIds: [] });
+    }
+
+    res.status(200).json(promo);
+  } catch (err) {
+    console.error("Error fetching promo:", err);
+    res.status(500).json({ message: "Failed to fetch promo" });
+  }
+});
+
+// Set a new promo
+router.post("/promo", verifyToken, verifyAdmin, async (req, res) => {
+  try {
+    const { vendorIds, durationHours } = req.body;
+
+    if (!vendorIds || !vendorIds.length)
+      return res.status(400).json({ message: "Select at least one vendor" });
+
+    const promo = new Promo({ vendorIds, durationHours });
+    await promo.save();
+
+    res.status(201).json({ message: "Promo saved", promo });
+  } catch (err) {
+    console.error("Error saving promo:", err);
+    res.status(500).json({ message: "Failed to save promo" });
   }
 });
 

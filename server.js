@@ -49,7 +49,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// ✅ Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/cart", cartRoutes);
@@ -61,6 +60,14 @@ app.use("/api/notifications", notificationRoutes);
 // ✅ Socket connection events
 io.on("connection", (socket) => {
   console.log("✅ Socket connected:", socket.id);
+    // userId and role will be sent from frontend when connecting
+    const { userId, role } = socket.handshake.query;
+    if (role === "vendor") socket.join("vendors");
+    else if (role === "customer") socket.join("customers");
+
+  // optional: personal room
+  socket.join(userId);
+
 
   socket.on("disconnect", () => {
     console.log("❌ Socket disconnected:", socket.id);

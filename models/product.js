@@ -35,7 +35,7 @@ const productSchema = new mongoose.Schema(
         "footwear",
         "accessories",
         "outdoor",
-        "art",
+        "food",
         "other",
       ],
     },

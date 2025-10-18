@@ -2,16 +2,14 @@ import mongoose from "mongoose";
 
 const notificationSchema = new mongoose.Schema(
   {
-    message: { type: String, required: true, trim: true },
-    target: { type: String, enum: ["vendor", "customer", "both"], default: "both" },
-    createdAt: { type: Date, default: Date.now },
-    expiresAt: { type: Date, default: () => new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) },
-    readBy: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }], // Tracks which users have read
+    title: { type: String, required: true },
+    message: { type: String, required: true },
+    recipientType: { type: String, enum: ["customer", "vendor", "both"], default: "both" },
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null }, // for specific user
+    readBy: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }], // track users who read
   },
   { timestamps: true }
 );
 
-// TTL index automatically deletes expired notifications
-notificationSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
-
-export default mongoose.model("Notification", notificationSchema);
+const Notification = mongoose.model("Notification", notificationSchema);
+export default Notification;

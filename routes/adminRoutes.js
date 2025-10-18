@@ -38,8 +38,6 @@ router.put("/verify-vendor/:id", verifyToken, verifyAdmin, async (req, res) => {
       return res.status(404).json({ message: "Vendor not found" });
 
     vendor.verified = verified;
-    const baseUsername = vendor.username.replace(/ ✅$/, "");
-    vendor.username = verified ? `${baseUsername} ✅` : baseUsername;
 
     await vendor.save();
     res.status(200).json({ message: `Vendor ${verified ? "verified" : "unverified"} successfully`, vendor });

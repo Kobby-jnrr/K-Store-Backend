@@ -1,11 +1,19 @@
 import express from "express";
 import { verifyToken, verifyAdmin } from "../middleware/authMiddleware.js";
+import { v2 as cloudinary } from "cloudinary";
 import User from "../models/user.js";
 import Product from "../models/product.js";
 import Order from "../models/order.js";
 import Promo from "../models/promo.js";
 
 const router = express.Router();
+
+/* ------------------ CLOUDINARY CONFIG ------------------ */
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 /* ------------------ DASHBOARD ------------------ */
 router.get("/dashboard", verifyToken, verifyAdmin, (req, res) => {
@@ -38,9 +46,12 @@ router.put("/verify-vendor/:id", verifyToken, verifyAdmin, async (req, res) => {
       return res.status(404).json({ message: "Vendor not found" });
 
     vendor.verified = verified;
-
     await vendor.save();
-    res.status(200).json({ message: `Vendor ${verified ? "verified" : "unverified"} successfully`, vendor });
+
+    res.status(200).json({
+      message: `Vendor ${verified ? "verified" : "unverified"} successfully`,
+      vendor,
+    });
   } catch (error) {
     console.error("Error verifying vendor:", error);
     res.status(500).json({ message: "Error verifying vendor" });
@@ -101,22 +112,50 @@ router.put("/update-user-role/:id", verifyToken, verifyAdmin, async (req, res) =
   }
 });
 
-// Delete a user (auto delete vendor products if vendor)
+// Delete a user (auto delete vendor products, promos, orders, and Cloudinary images)
 router.delete("/users/:id", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-
     const user = await User.findById(id);
-    if (!user || user.role === "admin")
-      return res.status(404).json({ message: "User not found or cannot delete admin" });
 
-    // If vendor, delete all their products
-    if (user.role === "vendor") {
-      await Product.deleteMany({ vendor: id });
+    if (!user || user.role === "admin") {
+      return res.status(404).json({ message: "User not found or cannot delete admin" });
     }
 
+    // If vendor — delete all related data and product images
+    if (user.role === "vendor") {
+      const vendorProducts = await Product.find({ vendor: id });
+
+      // Delete each product's image from Cloudinary
+      const imageDeletions = vendorProducts.map(async (product) => {
+        if (product.cloudinary_id) {
+          try {
+            await cloudinary.uploader.destroy(product.cloudinary_id);
+          } catch (err) {
+            console.warn(`Failed to delete image ${product.cloudinary_id}:`, err.message);
+          }
+        }
+      });
+
+      await Promise.all([
+        ...imageDeletions,
+        Product.deleteMany({ vendor: id }),
+        Promo.deleteMany({ vendor: id }),
+        Order.deleteMany({ "items.vendor": id }),
+      ]);
+    }
+
+    // If customer — delete all their orders
+    if (user.role === "customer") {
+      await Order.deleteMany({ user: id });
+    }
+
+    // Delete user
     await User.findByIdAndDelete(id);
-    res.status(200).json({ message: "User deleted successfully" });
+
+    res.status(200).json({
+      message: `User (${user.username}) and all associated data/images deleted successfully`,
+    });
   } catch (error) {
     console.error("Error deleting user:", error);
     res.status(500).json({ message: "Failed to delete user" });
@@ -149,14 +188,24 @@ router.put("/products/:id", verifyToken, verifyAdmin, async (req, res) => {
   }
 });
 
-// Delete a product
+// Delete a product (with Cloudinary image cleanup)
 router.delete("/products/:id", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const deletedProduct = await Product.findByIdAndDelete(id);
-    if (!deletedProduct) return res.status(404).json({ message: "Product not found" });
+    const product = await Product.findById(id);
+    if (!product) return res.status(404).json({ message: "Product not found" });
 
-    res.status(200).json({ message: "Product deleted successfully" });
+    // Delete image from Cloudinary if exists
+    if (product.cloudinary_id) {
+      try {
+        await cloudinary.uploader.destroy(product.cloudinary_id);
+      } catch (err) {
+        console.warn(`Failed to delete image ${product.cloudinary_id}:`, err.message);
+      }
+    }
+
+    await product.deleteOne();
+    res.status(200).json({ message: "Product and image deleted successfully" });
   } catch (error) {
     console.error("Error deleting product:", error);
     res.status(500).json({ message: "Failed to delete product" });
@@ -207,6 +256,5 @@ router.delete("/orders/:id", verifyToken, verifyAdmin, async (req, res) => {
     res.status(500).json({ message: "Failed to delete order" });
   }
 });
-
 
 export default router;

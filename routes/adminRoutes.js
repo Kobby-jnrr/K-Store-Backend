@@ -217,9 +217,9 @@ router.delete("/products/:id", verifyToken, verifyAdmin, async (req, res) => {
 router.get("/orders", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const orders = await Order.find()
-      .populate("user", "username email")
+      .populate("user", "username email phone location")
       .populate("items.product", "title price")
-      .populate("items.vendor", "username email");
+      .populate("items.vendor", "username email phone location");
 
     res.status(200).json(orders);
   } catch (error) {

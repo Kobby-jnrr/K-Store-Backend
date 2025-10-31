@@ -122,35 +122,48 @@ router.delete("/users/:id", verifyToken, verifyAdmin, async (req, res) => {
       return res.status(404).json({ message: "User not found or cannot delete admin" });
     }
 
-    // If vendor — delete all related data and product images
+    // If vendor — delete related data
     if (user.role === "vendor") {
       const vendorProducts = await Product.find({ vendor: id });
 
-      // Delete each product's image from Cloudinary
-      const imageDeletions = vendorProducts.map(async (product) => {
-        if (product.cloudinary_id) {
-          try {
-            await cloudinary.uploader.destroy(product.cloudinary_id);
-          } catch (err) {
-            console.warn(`Failed to delete image ${product.cloudinary_id}:`, err.message);
+      // Delete product images from Cloudinary
+      await Promise.all(
+        vendorProducts.map(async (product) => {
+          if (product.cloudinary_id) {
+            try {
+              await cloudinary.uploader.destroy(product.cloudinary_id);
+            } catch (err) {
+              console.warn(`Failed to delete image ${product.cloudinary_id}:`, err.message);
+            }
           }
-        }
-      });
+        })
+      );
 
-      await Promise.all([
-        ...imageDeletions,
-        Product.deleteMany({ vendor: id }),
-        Promo.deleteMany({ vendor: id }),
-        Order.deleteMany({ "items.vendor": id }),
-      ]);
+      // Delete vendor's products, promos
+      await Product.deleteMany({ vendor: id });
+      await Promo.deleteMany({ vendor: id });
+
+      // Remove vendor items from all orders
+      const orders = await Order.find({ "items.vendor": id });
+
+      for (const order of orders) {
+        order.items = order.items.filter(
+          (item) => item.vendor?.toString() !== id.toString()
+        );
+        if (order.items.length === 0) {
+          await order.deleteOne(); // Delete order if no items left
+        } else {
+          await order.save(); // Otherwise save updated order
+        }
+      }
     }
 
-    // If customer — delete all their orders
+    // If customer — delete their orders
     if (user.role === "customer") {
       await Order.deleteMany({ user: id });
     }
 
-    // Delete user
+    // Finally, delete user
     await User.findByIdAndDelete(id);
 
     res.status(200).json({
@@ -161,6 +174,7 @@ router.delete("/users/:id", verifyToken, verifyAdmin, async (req, res) => {
     res.status(500).json({ message: "Failed to delete user" });
   }
 });
+
 
 /* ------------------ PRODUCTS ------------------ */
 // Get all products

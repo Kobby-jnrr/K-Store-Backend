@@ -15,7 +15,7 @@ const generateTokens = (user) => {
   const refreshToken = jwt.sign(
     { id: user._id },
     process.env.JWT_REFRESH_SECRET,
-    { expiresIn: "7d" }
+    { expiresIn: "30d" }
   );
   return { accessToken, refreshToken };
 };
@@ -28,6 +28,14 @@ router.post("/register", async (req, res) => {
     // Check if user exists
     const existing = await User.findOne({ email });
     if (existing) return res.status(400).json({ msg: "User already exists" });
+
+    //Check if business name already exists (only if vendor and businessName provided)
+    if (role === "vendor" && businessName) {
+      const existingBusiness = await User.findOne({ businessName });
+      if (existingBusiness) {
+        return res.status(400).json({ msg: "Business name already exists. Please choose another." });
+      }
+    }
 
     // Hash password
     const hashed = await bcrypt.hash(password, 10);

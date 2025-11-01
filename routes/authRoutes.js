@@ -220,19 +220,27 @@ router.post("/reset-password", async (req, res) => {
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    if (user.password && user.password.length > 0)
-      return res.status(400).json({ message: "Password already set. Contact admin to clear it first." });
+    // ✅ Check if admin has cleared the password (resetAllowed = true)
+    if (!user.resetAllowed) {
+      return res.status(403).json({
+        message:
+          "Admin must first clear your password before you can set a new one.",
+      });
+    }
 
-    const hashed = await bcrypt.hash(newPassword, 10);
-    user.password = hashed;
+    // Hash new password and reset flag
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    user.password = hashedPassword;
+    user.resetAllowed = false; // disable further resets
     await user.save();
 
-    res.status(200).json({ message: "Password reset successful" });
+    res.status(200).json({
+      message: "Password reset successful. You can now log in.",
+    });
   } catch (err) {
     console.error("Error resetting password:", err);
     res.status(500).json({ message: "Server error" });
   }
 });
-
 
 export default router;

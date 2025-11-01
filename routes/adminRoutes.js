@@ -120,16 +120,22 @@ router.put("/users/:id/clear-password", verifyToken, verifyAdmin, async (req, re
 
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    // Clear the password field
+    // Mark user as allowed to reset password
     user.password = "";
-    await user.save();
+    user.resetAllowed = true;
 
-    res.status(200).json({ message: `Password for ${user.username} cleared successfully` });
+    // Save without validation
+    await user.save({ validateBeforeSave: false });
+
+    res.status(200).json({
+      message: `Password for ${user.username} cleared successfully. User can now reset password.`,
+    });
   } catch (error) {
     console.error("Error clearing password:", error);
     res.status(500).json({ message: "Failed to clear password" });
   }
 });
+
 
 
 // Delete a user (auto delete vendor products, promos, orders, and Cloudinary images)

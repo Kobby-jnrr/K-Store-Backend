@@ -83,10 +83,17 @@ router.post("/login", async (req, res) => {
     if (!email || !password) return res.status(400).json({ msg: "Please provide all fields" });
 
     const user = await User.findOne({ email });
-    if (!user) return res.status(400).json({ msg: "Invalid credentials" });
+    if (!user) return res.status(400).json({ msg: "No account found" });
+    
+      // If admin cleared the password (empty string), block login and instruct user to reset
+    if (!user.password || user.password.length === 0) {
+      return res.status(400).json({
+        msg: "Password has been cleared by admin. Please contact admin on WhatsApp and set a new password via the Forgot Password page.",
+      });
+    }
 
     const match = await bcrypt.compare(password, user.password);
-    if (!match) return res.status(400).json({ msg: "Invalid credentials" });
+    if (!match) return res.status(400).json({ msg: "Wrong Password" });
 
     const { accessToken, refreshToken } = generateTokens(user);
     user.refreshToken = refreshToken;
@@ -204,5 +211,28 @@ router.get("/status/:id", async (req, res) => {
     res.status(500).json({ message: "Failed to fetch user status" });
   }
 });
+
+// ------------------ RESET PASSWORD (after admin clears) ------------------
+router.post("/reset-password", async (req, res) => {
+  try {
+    const { email, newPassword } = req.body;
+
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    if (user.password && user.password.length > 0)
+      return res.status(400).json({ message: "Password already set. Contact admin to clear it first." });
+
+    const hashed = await bcrypt.hash(newPassword, 10);
+    user.password = hashed;
+    await user.save();
+
+    res.status(200).json({ message: "Password reset successful" });
+  } catch (err) {
+    console.error("Error resetting password:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 
 export default router;

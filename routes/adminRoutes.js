@@ -112,6 +112,26 @@ router.put("/update-user-role/:id", verifyToken, verifyAdmin, async (req, res) =
   }
 });
 
+// ------------------ CLEAR USER PASSWORD (Admin Only) ------------------
+router.put("/users/:id/clear-password", verifyToken, verifyAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await User.findById(id);
+
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // Clear the password field
+    user.password = "";
+    await user.save();
+
+    res.status(200).json({ message: `Password for ${user.username} cleared successfully` });
+  } catch (error) {
+    console.error("Error clearing password:", error);
+    res.status(500).json({ message: "Failed to clear password" });
+  }
+});
+
+
 // Delete a user (auto delete vendor products, promos, orders, and Cloudinary images)
 router.delete("/users/:id", verifyToken, verifyAdmin, async (req, res) => {
   try {

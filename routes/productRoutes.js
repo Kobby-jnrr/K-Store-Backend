@@ -93,7 +93,7 @@ router.get("/vendor/:vendorId", async (req, res) => {
 // -------------------- ADD NEW PRODUCT (VENDOR ONLY) --------------------
 router.post("/", verifyToken, verifyVendor, upload.single("image"), async (req, res) => {
   try {
-    const { title, price, category, description } = req.body;
+    const { title, price, oldPrice, category, description } = req.body;
 
     if (!title || !price || !category || !req.file) {
       return res.status(400).json({ message: "Missing required fields" });
@@ -114,6 +114,7 @@ router.post("/", verifyToken, verifyVendor, upload.single("image"), async (req, 
     const product = new Product({
       title,
       price,
+      oldPrice: oldPrice || null,
       category: category.toLowerCase(),
       description,
       image: result.secure_url,

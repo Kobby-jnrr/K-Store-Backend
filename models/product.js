@@ -2,10 +2,20 @@ import mongoose from "mongoose";
 
 const productSchema = new mongoose.Schema(
   {
-    title: { type: String, required: true, trim: true },
-    price: { type: Number, required: true, min: 0 },
+    title: { 
+      type: String, 
+      required: true, 
+      trim: true 
+    },
+    price: { 
+      type: Number, 
+      required: true, 
+      min: 0 
+    },
+    oldPrice: { 
+      type: Number, 
+      min: 0 },
 
-    // Expanded categories
     category: {
       type: String,
       required: true,
@@ -40,8 +50,13 @@ const productSchema = new mongoose.Schema(
       ],
     },
 
-    image: { type: String, required: true },
-    cloudinary_id: { type: String }, // store Cloudinary public_id
+    image: { 
+      type: String, 
+      required: true 
+    },
+    cloudinary_id: { 
+      type: String 
+    }, // store Cloudinary public_id
     description: { type: String, trim: true },
 
     // Track product status

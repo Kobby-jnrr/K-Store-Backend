@@ -20,11 +20,16 @@ cloudinary.config({
 // -------------------- GET ALL PRODUCTS --------------------
 router.get("/", async (req, res) => {
   try {
-    const products = await Product.find().populate("vendor", "username verified");
+    const products = await Product.find().populate(
+      "vendor",
+      "username verified location phone"
+    );
     const result = products.map((p) => ({
       ...p.toObject(),
       vendorName: p.vendor?.username || "Unknown",
       vendorVerified: p.vendor?.verified || false,
+      vendorLocation: p.vendor?.location || "Unknown",
+      vendorPhone: p.vendor?.phone || "N/A",
     }));
     res.json(result);
   } catch (err) {
@@ -37,16 +42,20 @@ router.get("/vendor", verifyToken, verifyVendor, async (req, res) => {
   try {
     const products = await Product.find({ vendor: req.user._id }).populate(
       "vendor",
-      "username verified"
+      "username verified location phone"
     );
     const result = products.map((p) => ({
       ...p.toObject(),
       vendorName: p.vendor?.username || "Unknown",
       vendorVerified: p.vendor?.verified || false,
+      vendorLocation: p.vendor?.location || "Unknown",
+      vendorPhone: p.vendor?.phone || "N/A",
     }));
     res.json(result);
   } catch (err) {
-    res.status(500).json({ message: "Error fetching vendor products", error: err.message });
+    res
+      .status(500)
+      .json({ message: "Error fetching vendor products", error: err.message });
   }
 });
 
@@ -54,14 +63,15 @@ router.get("/vendor", verifyToken, verifyVendor, async (req, res) => {
 router.get("/:category", async (req, res) => {
   try {
     const { category } = req.params;
-    const products = await Product.find({ category: new RegExp(`^${category}$`, "i") }).populate(
-      "vendor",
-      "username verified"
-    );
+    const products = await Product.find({
+      category: new RegExp(`^${category}$`, "i"),
+    }).populate("vendor", "username verified location phone");
     const result = products.map((p) => ({
       ...p.toObject(),
       vendorName: p.vendor?.username || "Unknown",
       vendorVerified: p.vendor?.verified || false,
+      vendorLocation: p.vendor?.location || "Unknown",
+      vendorPhone: p.vendor?.phone || "N/A",
     }));
     res.json(result);
   } catch (err) {
@@ -72,90 +82,42 @@ router.get("/:category", async (req, res) => {
 // GET PRODUCTS BY VENDOR (PUBLIC)
 router.get("/vendor/:vendorId", async (req, res) => {
   try {
-    const products = await Product.find({ vendor: req.params.vendorId }).populate(
-      "vendor",
-      "username verified"
-    );
+    const products = await Product.find({
+      vendor: req.params.vendorId,
+    }).populate("vendor", "username verified location phone");
 
     const result = products.map((p) => ({
       ...p.toObject(),
       vendorName: p.vendor?.username || "Unknown",
       vendorVerified: p.vendor?.verified || false,
       vendorId: p.vendor?._id || null,
+      vendorLocation: p.vendor?.location || "Unknown",
+      vendorPhone: p.vendor?.phone || "N/A",
     }));
 
     res.json(result);
   } catch (err) {
-    res.status(500).json({ message: "Error fetching vendor products", error: err.message });
+    res
+      .status(500)
+      .json({ message: "Error fetching vendor products", error: err.message });
   }
 });
 
 // -------------------- ADD NEW PRODUCT (VENDOR ONLY) --------------------
-router.post("/", verifyToken, verifyVendor, upload.single("image"), async (req, res) => {
-  try {
-    const { title, price, oldPrice, category, description } = req.body;
+router.post(
+  "/",
+  verifyToken,
+  verifyVendor,
+  upload.single("image"),
+  async (req, res) => {
+    try {
+      const { title, price, oldPrice, category, description } = req.body;
 
-    if (!title || !price || !category || !req.file) {
-      return res.status(400).json({ message: "Missing required fields" });
-    }
-
-    // Upload image to Cloudinary
-    const result = await new Promise((resolve, reject) => {
-      const stream = cloudinary.uploader.upload_stream(
-        { folder: "kstore_products" },
-        (error, result) => {
-          if (error) reject(error);
-          else resolve(result);
-        }
-      );
-      stream.end(req.file.buffer);
-    });
-
-    const product = new Product({
-      title,
-      price,
-      oldPrice: oldPrice || null,
-      category: category.toLowerCase(),
-      description,
-      image: result.secure_url,
-      cloudinary_id: result.public_id,
-      vendor: req.user._id,
-    });
-
-    await product.save();
-    await product.populate("vendor", "username verified");
-
-    res.status(201).json({
-      message: "Product added successfully",
-      product: {
-        ...product.toObject(),
-        vendorName: product.vendor.username,
-        vendorVerified: product.vendor.verified,
-      },
-    });
-  } catch (err) {
-    res.status(500).json({ message: "Error adding product", error: err.message });
-  }
-});
-
-// -------------------- UPDATE PRODUCT (VENDOR ONLY) --------------------
-router.put("/:id", verifyToken, verifyVendor, upload.single("image"), async (req, res) => {
-  try {
-    const { id } = req.params;
-    const product = await Product.findById(id);
-    if (!product) return res.status(404).json({ message: "Product not found" });
-
-    if (product.vendor.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: "Not authorized to update this product" });
-    }
-
-    if (req.file) {
-      // Delete old image from Cloudinary
-      if (product.cloudinary_id) {
-        await cloudinary.uploader.destroy(product.cloudinary_id);
+      if (!title || !price || !category || !req.file) {
+        return res.status(400).json({ message: "Missing required fields" });
       }
 
-      // Upload new image
+      // Upload image to Cloudinary
       const result = await new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
           { folder: "kstore_products" },
@@ -167,26 +129,96 @@ router.put("/:id", verifyToken, verifyVendor, upload.single("image"), async (req
         stream.end(req.file.buffer);
       });
 
-      req.body.image = result.secure_url;
-      req.body.cloudinary_id = result.public_id;
+      const product = new Product({
+        title,
+        price,
+        oldPrice: oldPrice || null,
+        category: category.toLowerCase(),
+        description,
+        image: result.secure_url,
+        cloudinary_id: result.public_id,
+        vendor: req.user._id,
+      });
+
+      await product.save();
+      await product.populate("vendor", "username verified location phone");
+
+      res.status(201).json({
+        message: "Product added successfully",
+        product: {
+          ...product.toObject(),
+          vendorName: product.vendor.username,
+          vendorVerified: product.vendor.verified,
+        },
+      });
+    } catch (err) {
+      res
+        .status(500)
+        .json({ message: "Error adding product", error: err.message });
     }
-
-    Object.assign(product, req.body);
-    await product.save();
-    await product.populate("vendor", "username verified");
-
-    res.json({
-      message: "Product updated successfully",
-      product: {
-        ...product.toObject(),
-        vendorName: product.vendor.username,
-        vendorVerified: product.vendor.verified,
-      },
-    });
-  } catch (err) {
-    res.status(500).json({ message: "Error updating product", error: err.message });
   }
-});
+);
+
+// -------------------- UPDATE PRODUCT (VENDOR ONLY) --------------------
+router.put(
+  "/:id",
+  verifyToken,
+  verifyVendor,
+  upload.single("image"),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const product = await Product.findById(id);
+      if (!product)
+        return res.status(404).json({ message: "Product not found" });
+
+      if (product.vendor.toString() !== req.user._id.toString()) {
+        return res
+          .status(403)
+          .json({ message: "Not authorized to update this product" });
+      }
+
+      if (req.file) {
+        // Delete old image from Cloudinary
+        if (product.cloudinary_id) {
+          await cloudinary.uploader.destroy(product.cloudinary_id);
+        }
+
+        // Upload new image
+        const result = await new Promise((resolve, reject) => {
+          const stream = cloudinary.uploader.upload_stream(
+            { folder: "kstore_products" },
+            (error, result) => {
+              if (error) reject(error);
+              else resolve(result);
+            }
+          );
+          stream.end(req.file.buffer);
+        });
+
+        req.body.image = result.secure_url;
+        req.body.cloudinary_id = result.public_id;
+      }
+
+      Object.assign(product, req.body);
+      await product.save();
+      await product.populate("vendor", "username verified location phone");
+
+      res.json({
+        message: "Product updated successfully",
+        product: {
+          ...product.toObject(),
+          vendorName: product.vendor.username,
+          vendorVerified: product.vendor.verified,
+        },
+      });
+    } catch (err) {
+      res
+        .status(500)
+        .json({ message: "Error updating product", error: err.message });
+    }
+  }
+);
 
 // -------------------- DELETE PRODUCT (VENDOR ONLY) --------------------
 router.delete("/:id", verifyToken, verifyVendor, async (req, res) => {
@@ -196,7 +228,9 @@ router.delete("/:id", verifyToken, verifyVendor, async (req, res) => {
     if (!product) return res.status(404).json({ message: "Product not found" });
 
     if (product.vendor.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: "Not authorized to delete this product" });
+      return res
+        .status(403)
+        .json({ message: "Not authorized to delete this product" });
     }
 
     // Delete image from Cloudinary
@@ -207,7 +241,9 @@ router.delete("/:id", verifyToken, verifyVendor, async (req, res) => {
     await product.deleteOne();
     res.json({ message: "Product and image deleted successfully" });
   } catch (err) {
-    res.status(500).json({ message: "Error deleting product", error: err.message });
+    res
+      .status(500)
+      .json({ message: "Error deleting product", error: err.message });
   }
 });
 

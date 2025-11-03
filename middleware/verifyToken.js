@@ -1,3 +1,4 @@
+// verifyToken.js
 import jwt from "jsonwebtoken";
 import User from "../models/user.js";
 
@@ -15,6 +16,9 @@ export const verifyToken = async (req, res, next) => {
     req.user = await User.findById(decoded.id).select("-password");
     next();
   } catch (err) {
-    res.status(401).json({ message: "Invalid token" });
+    if (err.name === "TokenExpiredError") {
+      return res.status(401).json({ message: "TokenExpired" }); // ✅ trigger frontend refresh
+    }
+    return res.status(401).json({ message: "Invalid token" });
   }
 };

@@ -1,7 +1,18 @@
 import express from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import { v2 as cloudinary } from "cloudinary";
 import User from "../models/user.js";
+import Product from "../models/product.js";
+import Promo from "../models/promo.js";
+import Order from "../models/order.js";
+
+// ---------------- CLOUDINARY CONFIG ----------------
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 const router = express.Router();
 
@@ -23,7 +34,8 @@ const generateTokens = (user) => {
 // ---------------- REGISTER ----------------
 router.post("/register", async (req, res) => {
   try {
-    const { username, email, password, role, phone, location, businessName } = req.body;
+    const { username, email, password, role, phone, location, businessName } =
+      req.body;
 
     // Check if user exists
     const existing = await User.findOne({ email });
@@ -33,7 +45,9 @@ router.post("/register", async (req, res) => {
     if (role === "vendor" && businessName) {
       const existingBusiness = await User.findOne({ businessName });
       if (existingBusiness) {
-        return res.status(400).json({ msg: "Business name already exists. Please choose another." });
+        return res.status(400).json({
+          msg: "Business name already exists. Please choose another.",
+        });
       }
     }
 
@@ -80,12 +94,13 @@ router.post("/register", async (req, res) => {
 router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
-    if (!email || !password) return res.status(400).json({ msg: "Please provide all fields" });
+    if (!email || !password)
+      return res.status(400).json({ msg: "Please provide all fields" });
 
     const user = await User.findOne({ email });
     if (!user) return res.status(400).json({ msg: "No account found" });
-    
-      // If admin cleared the password (empty string), block login and instruct user to reset
+
+    // If admin cleared the password (empty string), block login and instruct user to reset
     if (!user.password || user.password.length === 0) {
       return res.status(400).json({
         msg: "Password has been cleared by admin. Please contact admin on WhatsApp and set a new password via the Forgot Password page.",
@@ -154,12 +169,14 @@ router.put("/update/:id", async (req, res) => {
 // ---------------- REFRESH TOKEN ----------------
 router.post("/refresh", async (req, res) => {
   const { refreshToken } = req.body;
-  if (!refreshToken) return res.status(401).json({ msg: "Refresh token required" });
+  if (!refreshToken)
+    return res.status(401).json({ msg: "Refresh token required" });
 
   try {
     const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
     const user = await User.findById(decoded.id);
-    if (!user || user.refreshToken !== refreshToken) return res.status(403).json({ msg: "Invalid refresh token" });
+    if (!user || user.refreshToken !== refreshToken)
+      return res.status(403).json({ msg: "Invalid refresh token" });
 
     const { accessToken, refreshToken: newRefresh } = generateTokens(user);
     user.refreshToken = newRefresh;
@@ -174,7 +191,8 @@ router.post("/refresh", async (req, res) => {
 // ---------------- LOGOUT ----------------
 router.post("/logout", async (req, res) => {
   const { refreshToken } = req.body;
-  if (!refreshToken) return res.status(400).json({ msg: "Refresh token required" });
+  if (!refreshToken)
+    return res.status(400).json({ msg: "Refresh token required" });
 
   try {
     const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
@@ -190,11 +208,76 @@ router.post("/logout", async (req, res) => {
   }
 });
 
+router.delete("/delete/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const user = await User.findById(id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // If vendor — remove their products, promos, and related orders
+    if (user.role === "vendor") {
+      const vendorProducts = await Product.find({ vendor: id });
+
+      // Delete product images from Cloudinary
+      await Promise.all(
+        vendorProducts.map(async (product) => {
+          if (product.cloudinary_id) {
+            try {
+              await cloudinary.uploader.destroy(product.cloudinary_id);
+            } catch (err) {
+              console.warn(
+                `⚠️ Failed to delete image ${product.cloudinary_id}:`,
+                err.message
+              );
+            }
+          }
+        })
+      );
+
+      // Delete vendor's products & promos
+      await Product.deleteMany({ vendor: id });
+      await Promo.deleteMany({ vendor: id });
+
+      // Remove vendor’s items from all orders
+      const orders = await Order.find({ "items.vendor": id });
+      for (const order of orders) {
+        order.items = order.items.filter(
+          (item) => item.vendor?.toString() !== id.toString()
+        );
+        if (order.items.length === 0) {
+          await order.deleteOne();
+        } else {
+          await order.save();
+        }
+      }
+    }
+
+    // If customer — delete their orders
+    if (user.role === "customer") {
+      await Order.deleteMany({ user: id });
+    }
+
+    // Delete user
+    await User.findByIdAndDelete(id);
+
+    res.status(200).json({
+      message:
+        "Your account and all related data have been deleted successfully.",
+    });
+  } catch (error) {
+    console.error("❌ Error deleting user account:", error);
+    res.status(500).json({ message: "Failed to delete account" });
+  }
+});
+
 // ---------------- USER STATUS ----------------
 router.get("/status/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const user = await User.findById(id).select("username email verified role phone location businessName");
+    const user = await User.findById(id).select(
+      "username email verified role phone location businessName"
+    );
     if (!user) return res.status(404).json({ message: "User not found" });
 
     res.status(200).json({

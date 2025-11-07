@@ -39,13 +39,15 @@ const userSchema = new mongoose.Schema(
     },
     verified: {
       type: Boolean,
-      default: false, // for admin verification of vendors
+      default: false,
     },
     school: {
       type: String,
-      required: true,
+      required: function () {
+        return this.role === "customer" || this.role === "vendor";
+      },
       trim: true,
-      lowercase: true, // ✅ keep consistent with User and Product
+      lowercase: true,
     },
     refreshToken: {
       type: String,

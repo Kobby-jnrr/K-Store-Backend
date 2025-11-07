@@ -148,12 +148,13 @@ router.post("/login", async (req, res) => {
 router.put("/update/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const { phone, location, businessName } = req.body;
+    const { phone, school, location, businessName } = req.body;
 
     const user = await User.findById(id);
     if (!user) return res.status(404).json({ message: "User not found" });
 
     if (phone !== undefined) user.phone = phone;
+    if (school !== undefined) user.school = school;
     if (location !== undefined) user.location = location;
     if (businessName !== undefined) user.businessName = businessName;
 

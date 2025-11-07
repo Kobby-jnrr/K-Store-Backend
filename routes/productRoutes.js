@@ -22,12 +22,13 @@ router.get("/", async (req, res) => {
   try {
     const products = await Product.find().populate(
       "vendor",
-      "username verified location phone"
+      "username verified school location phone"
     );
     const result = products.map((p) => ({
       ...p.toObject(),
       vendorName: p.vendor?.username || "Unknown",
       vendorVerified: p.vendor?.verified || false,
+      vendorSchool: p.vendor?.school || "Unknown",
       vendorLocation: p.vendor?.location || "Unknown",
       vendorPhone: p.vendor?.phone || "N/A",
     }));
@@ -42,12 +43,13 @@ router.get("/vendor", verifyToken, verifyVendor, async (req, res) => {
   try {
     const products = await Product.find({ vendor: req.user._id }).populate(
       "vendor",
-      "username verified location phone"
+      "username verified school location phone"
     );
     const result = products.map((p) => ({
       ...p.toObject(),
       vendorName: p.vendor?.username || "Unknown",
       vendorVerified: p.vendor?.verified || false,
+      vendorSchool: p.vendor?.school || "Unknown",
       vendorLocation: p.vendor?.location || "Unknown",
       vendorPhone: p.vendor?.phone || "N/A",
     }));
@@ -65,11 +67,12 @@ router.get("/:category", async (req, res) => {
     const { category } = req.params;
     const products = await Product.find({
       category: new RegExp(`^${category}$`, "i"),
-    }).populate("vendor", "username verified location phone");
+    }).populate("vendor", "username verified school location phone");
     const result = products.map((p) => ({
       ...p.toObject(),
       vendorName: p.vendor?.username || "Unknown",
       vendorVerified: p.vendor?.verified || false,
+      vendorSchool: p.vendor?.school || "Unknown",
       vendorLocation: p.vendor?.location || "Unknown",
       vendorPhone: p.vendor?.phone || "N/A",
     }));
@@ -84,13 +87,14 @@ router.get("/vendor/:vendorId", async (req, res) => {
   try {
     const products = await Product.find({
       vendor: req.params.vendorId,
-    }).populate("vendor", "username verified location phone");
+    }).populate("vendor", "username verified school location phone");
 
     const result = products.map((p) => ({
       ...p.toObject(),
       vendorName: p.vendor?.username || "Unknown",
       vendorVerified: p.vendor?.verified || false,
       vendorId: p.vendor?._id || null,
+      vendorSchool: p.vendor?.school || "Unknown",
       vendorLocation: p.vendor?.location || "Unknown",
       vendorPhone: p.vendor?.phone || "N/A",
     }));
@@ -100,6 +104,29 @@ router.get("/vendor/:vendorId", async (req, res) => {
     res
       .status(500)
       .json({ message: "Error fetching vendor products", error: err.message });
+  }
+});
+
+// -------------------- GET PRODUCTS BY SCHOOL --------------------
+router.get("/school/:school", async (req, res) => {
+  try {
+    const { school } = req.params;
+    const products = await Product.find({
+      school: new RegExp(`^${school}$`, "i"),
+    }).populate("vendor", "username verified school location phone school");
+
+    const result = products.map((p) => ({
+      ...p.toObject(),
+      vendorName: p.vendor?.username || "Unknown",
+      vendorVerified: p.vendor?.verified || false,
+      vendorLocation: p.vendor?.location || "Unknown",
+      vendorPhone: p.vendor?.phone || "N/A",
+      vendorSchool: p.vendor?.school || "Unknown",
+    }));
+
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -138,10 +165,14 @@ router.post(
         image: result.secure_url,
         cloudinary_id: result.public_id,
         vendor: req.user._id,
+        school: req.user.school,
       });
 
       await product.save();
-      await product.populate("vendor", "username verified location phone");
+      await product.populate(
+        "vendor",
+        "username verified school location phone"
+      );
 
       res.status(201).json({
         message: "Product added successfully",
@@ -202,7 +233,10 @@ router.put(
 
       Object.assign(product, req.body);
       await product.save();
-      await product.populate("vendor", "username verified location phone");
+      await product.populate(
+        "vendor",
+        "username verified school location phone"
+      );
 
       res.json({
         message: "Product updated successfully",

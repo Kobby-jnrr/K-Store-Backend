@@ -2,8 +2,17 @@ import mongoose from "mongoose";
 
 const orderSchema = new mongoose.Schema(
   {
-    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    school: {
+      type: String,
+      required: true,
+      trim: true,
+      lowercase: true, // ✅ keep consistent with User and Product
+    },
     items: [
       {
         product: {
@@ -11,8 +20,14 @@ const orderSchema = new mongoose.Schema(
           ref: "Product",
           required: true,
         },
-        quantity: { type: Number, required: true },
-        price: { type: Number, required: true },
+        quantity: {
+          type: Number,
+          required: true,
+        },
+        price: {
+          type: Number,
+          required: true,
+        },
         vendor: {
           type: mongoose.Schema.Types.ObjectId,
           ref: "User",
@@ -33,10 +48,18 @@ const orderSchema = new mongoose.Schema(
       },
     ],
 
-    total: { type: Number, required: true },
-    paymentMethod: { type: String, enum: ["cod", "momo"], required: true },
-    momoNumber: { type: String },
-
+    total: {
+      type: Number,
+      required: true,
+    },
+    paymentMethod: {
+      type: String,
+      enum: ["cod", "momo"],
+      required: true,
+    },
+    momoNumber: {
+      type: String,
+    },
     fulfillmentType: {
       type: String,
       enum: ["pickup", "delivery"],
@@ -44,9 +67,12 @@ const orderSchema = new mongoose.Schema(
       default: "pickup",
     },
 
-    phone: { type: String },
-    location: { type: String },
-
+    phone: {
+      type: String,
+    },
+    location: {
+      type: String,
+    },
     status: {
       type: String,
       enum: ["pending", "confirmed", "delivered"],

@@ -24,7 +24,7 @@ const userSchema = new mongoose.Schema(
     },
     phone: {
       type: String,
-      default: "", 
+      default: "",
     },
     location: {
       type: String,
@@ -35,11 +35,17 @@ const userSchema = new mongoose.Schema(
       trim: true,
       unique: true,
       sparse: true,
-      default: "", 
+      default: "",
     },
     verified: {
       type: Boolean,
       default: false, // for admin verification of vendors
+    },
+    school: {
+      type: String,
+      required: true,
+      trim: true,
+      lowercase: true, // ✅ keep consistent with User and Product
     },
     refreshToken: {
       type: String,
@@ -47,8 +53,7 @@ const userSchema = new mongoose.Schema(
     resetAllowed: {
       type: Boolean,
       default: false,
-}
-
+    },
   },
   { timestamps: true }
 );

@@ -34,8 +34,16 @@ const generateTokens = (user) => {
 // ---------------- REGISTER ----------------
 router.post("/register", async (req, res) => {
   try {
-    const { username, email, password, role, phone, location, businessName } =
-      req.body;
+    const {
+      username,
+      email,
+      password,
+      role,
+      phone,
+      school,
+      location,
+      businessName,
+    } = req.body;
 
     // Check if user exists
     const existing = await User.findOne({ email });
@@ -61,6 +69,7 @@ router.post("/register", async (req, res) => {
       password: hashed,
       role: role || "customer",
       phone: phone || "",
+      school,
       location: location || "",
       businessName: businessName || "",
     });
@@ -80,6 +89,7 @@ router.post("/register", async (req, res) => {
         email: user.email,
         role: user.role,
         phone: user.phone,
+        school: user.school,
         location: user.location,
         businessName: user.businessName,
       },
@@ -123,6 +133,7 @@ router.post("/login", async (req, res) => {
         email: user.email,
         role: user.role,
         phone: user.phone,
+        school: user.school,
         location: user.location,
         businessName: user.businessName,
       },
@@ -156,6 +167,7 @@ router.put("/update/:id", async (req, res) => {
         email: user.email,
         role: user.role,
         phone: user.phone,
+        school: user.school,
         location: user.location,
         businessName: user.businessName,
       },
@@ -286,6 +298,7 @@ router.get("/status/:id", async (req, res) => {
       role: user.role,
       email: user.email,
       phone: user.phone || "Not added yet",
+      school: user.school,
       location: user.location || "No location set",
       businessName: user.businessName || "Not added yet",
     });

@@ -8,13 +8,15 @@ const router = express.Router();
 /* ===================== CREATE ORDER ===================== */
 router.post("/", verifyToken, async (req, res) => {
   try {
-    const { items, total, paymentMethod, momoNumber, fulfillmentType } = req.body;
+    const { items, total, paymentMethod, momoNumber, fulfillmentType } =
+      req.body;
 
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ error: "User not found" });
 
     const order = new Order({
       user: req.user.id,
+      school: user.school,
       items,
       total,
       paymentMethod,
@@ -83,47 +85,58 @@ router.get("/vendor-orders", verifyToken, async (req, res) => {
 });
 
 /* ===================== UPDATE VENDOR ITEM STATUS ===================== */
-router.put("/vendor-orders/:orderId/item/:itemId", verifyToken, async (req, res) => {
-  try {
-    const { orderId, itemId } = req.params;
-    const { status } = req.body;
-    const vendorId = req.user.id;
+router.put(
+  "/vendor-orders/:orderId/item/:itemId",
+  verifyToken,
+  async (req, res) => {
+    try {
+      const { orderId, itemId } = req.params;
+      const { status } = req.body;
+      const vendorId = req.user.id;
 
-    const order = await Order.findById(orderId);
-    if (!order) return res.status(404).json({ error: "Order not found" });
+      const order = await Order.findById(orderId);
+      if (!order) return res.status(404).json({ error: "Order not found" });
 
-    const item = order.items.id(itemId);
-    if (!item) return res.status(404).json({ error: "Item not found" });
+      const item = order.items.id(itemId);
+      if (!item) return res.status(404).json({ error: "Item not found" });
 
-    if (item.vendor.toString() !== vendorId)
-      return res.status(403).json({ error: "Not authorized" });
+      if (item.vendor.toString() !== vendorId)
+        return res.status(403).json({ error: "Not authorized" });
 
-    const validStatuses = [
-      "pending",
-      "accepted",
-      "rejected",
-      "preparing",
-      "ready",
-      "delivered",
-    ];
-    if (!validStatuses.includes(status))
-      return res.status(400).json({ error: "Invalid status" });
+      const validStatuses = [
+        "pending",
+        "accepted",
+        "rejected",
+        "preparing",
+        "ready",
+        "delivered",
+      ];
+      if (!validStatuses.includes(status))
+        return res.status(400).json({ error: "Invalid status" });
 
-    item.status = status;
+      item.status = status;
 
-    const allStatuses = order.items.map((i) => i.status);
-    if (allStatuses.every((s) => s === "delivered")) order.status = "delivered";
-    else if (allStatuses.some((s) => ["ready", "preparing", "accepted"].includes(s)))
-      order.status = "confirmed";
-    else order.status = "pending";
+      const allStatuses = order.items.map((i) => i.status);
+      if (allStatuses.every((s) => s === "delivered"))
+        order.status = "delivered";
+      else if (
+        allStatuses.some((s) => ["ready", "preparing", "accepted"].includes(s))
+      )
+        order.status = "confirmed";
+      else order.status = "pending";
 
-    await order.save();
+      await order.save();
 
-    res.json({ message: "Item status updated", item, orderStatus: order.status });
-  } catch (err) {
-    console.error("Failed to update item status:", err);
-    res.status(500).json({ error: "Failed to update item status" });
+      res.json({
+        message: "Item status updated",
+        item,
+        orderStatus: order.status,
+      });
+    } catch (err) {
+      console.error("Failed to update item status:", err);
+      res.status(500).json({ error: "Failed to update item status" });
+    }
   }
-});
+);
 
 export default router;

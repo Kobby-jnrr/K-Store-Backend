@@ -71,7 +71,8 @@ router.post("/register", async (req, res) => {
       phone: phone || "",
       school,
       location: location || "",
-      businessName: businessName || "",
+      businessName:
+        role === "vendor" ? businessName?.trim() || null : undefined,
     });
 
     // Generate tokens

@@ -33,9 +33,8 @@ const userSchema = new mongoose.Schema(
     businessName: {
       type: String,
       trim: true,
-      unique: true,
       sparse: true,
-      default: null,
+      default: "",
     },
     verified: {
       type: Boolean,

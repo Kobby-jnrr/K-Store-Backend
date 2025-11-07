@@ -50,13 +50,16 @@ router.post("/register", async (req, res) => {
     if (existing) return res.status(400).json({ msg: "User already exists" });
 
     //Check if business name already exists (only if vendor and businessName provided)
-    if (role === "vendor" && businessName) {
-      const existingBusiness = await User.findOne({ businessName });
+    if (businessName !== undefined && user.role === "vendor") {
+      const existingBusiness = await User.findOne({
+        businessName,
+        role: "vendor",
+        _id: { $ne: user._id }, // exclude current user
+      });
       if (existingBusiness) {
-        return res.status(400).json({
-          msg: "Business name already exists. Please choose another.",
-        });
+        return res.status(400).json({ msg: "Business name already exists." });
       }
+      user.businessName = businessName;
     }
 
     // Hash password

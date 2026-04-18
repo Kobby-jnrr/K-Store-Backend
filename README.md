@@ -1,8 +1,8 @@
- K-Store Backend API
+# K-Store Backend API
 
 This is the server-side application for **K-Store**, a peer-to-peer marketplace platform built for university students. It handles data management, user authentication, and secure transactions.
 
- 🛠 Tech Stack
+## 🛠 Tech Stack
 - **Runtime:** Node.js
 - **Framework:** Express.js
 - **Database:** MySQL
@@ -10,7 +10,7 @@ This is the server-side application for **K-Store**, a peer-to-peer marketplace 
 - **Security:** Bcrypt (Password hashing)
 - **File Handling:** Multer
 
- ✨ Key Features
+## ✨ Key Features
 - **User Authentication:** Secure registration and login system.
 - **Product Management:** Full CRUD operations (Create, Read, Update, Delete) for marketplace items.
 - **Relational Database:** Structured MySQL schema for efficient data handling.
